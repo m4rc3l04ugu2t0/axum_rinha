@@ -1,5 +1,5 @@
 [workspace]
-members = ["load_balance" , "load_balance_tcp"]
+members = [ "db","load_balance" , "load_balance_tcp"]
 
 [package]
 name = "axum_rinha"
