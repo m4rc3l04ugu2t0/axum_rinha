@@ -1,0 +1,8 @@
+FROM rust:latest AS builder
+WORKDIR /usr/src/load_balance_tcp
+COPY ./load_balance_tcp .
+RUN cargo install --path .
+
+FROM archlinux:latest
+COPY --from=builder /usr/local/cargo/bin/load_balance_tcp /usr/local/bin/load_balance_tcp
+CMD ["load_balance_tcp"]

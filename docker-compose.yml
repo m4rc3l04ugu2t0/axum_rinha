@@ -2,16 +2,45 @@ services:
   api01: &api
     build:
       context: .
+      dockerfile: Dockerfile
     hostname: api01
+    # environment:
+    #   - PORT=9998
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: "0.5GB"
+          cpus: "0.3"
+          memory: "100MB"
 
   api02:
     <<: *api
     hostname: api02
+    # environment:
+    #   - PORT=9997
+
+  # ld-tcp:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.ld-tcp
+  #   ports:
+  #     - "9999:9999"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "0.9"
+  #         memory: "100MB"
+
+  # ld:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.ld
+  #   ports:
+  #     - "9999:9999"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "0.9"
+  #         memory: "100MB"
 
   nginx:
     image: nginx:latest

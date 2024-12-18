@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     collections::{HashMap, VecDeque},
+    env,
     sync::Arc,
 };
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
@@ -68,7 +69,7 @@ impl Account {
         }
     }
 
-    pub fn transect(&mut self, transaction: Transaction) -> Result<(), &'static str> {
+    pub fn transact(&mut self, transaction: Transaction) -> Result<(), &'static str> {
         match transaction.kind {
             TransactionType::Credit => {
                 self.balance += transaction.value;
@@ -105,6 +106,7 @@ struct Transaction {
     created_at: OffsetDateTime,
 }
 
+#[allow(unused)]
 #[derive(Clone, Deserialize)]
 struct TransactionPay {
     value: i32,
@@ -116,6 +118,11 @@ type AppState = Arc<HashMap<u8, RwLock<Account>>>;
 
 #[tokio::main]
 async fn main() {
+    let port = env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(8080);
+
     let accounts = HashMap::<u8, RwLock<Account>>::from_iter([
         (1, RwLock::new(Account::with_limit(100_000))),
         (2, RwLock::new(Account::with_limit(80_000))),
@@ -129,7 +136,9 @@ async fn main() {
         .route("/clients/:id/extract", get(view_account))
         .with_state(Arc::new(accounts));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
+        .await
+        .unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -142,7 +151,7 @@ async fn create_transaction(
         Some(account) => {
             let mut account = account.write().await;
 
-            match account.transect(transaction) {
+            match account.transact(transaction) {
                 Ok(()) => Ok(Json(json!({
                     "limit": account.limit,
                     "balance": account.balance
