@@ -76,6 +76,7 @@ impl Account {
                 self.transaction.push(transaction);
                 Ok(())
             }
+
             TransactionType::Debit => {
                 if self.balance + self.limit >= transaction.value {
                     self.balance -= transaction.value;

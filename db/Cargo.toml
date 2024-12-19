@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 bitcode = { version = "0.6.3", features = ["serde"] }
 serde = { version ="1.0.216", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3.14.0"
