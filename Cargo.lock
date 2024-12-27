@@ -106,6 +106,7 @@ name = "axum_rinha"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "db",
  "serde",
  "serde_json",
  "time",

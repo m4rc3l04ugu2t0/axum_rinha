@@ -66,8 +66,8 @@ impl<const ROW_SIZE: usize> Page<ROW_SIZE> {
                 buf.copy_from_slice(&row[0..8]);
                 u64::from_be_bytes(buf) as usize
             };
-
             cursor += 1;
+
             Some(&row[8..8 + size])
         })
     }
@@ -93,7 +93,7 @@ impl Default for Page {
     }
 }
 
-struct Db<T, const ROW_SIZE: usize = 64> {
+pub struct Db<T, const ROW_SIZE: usize = 64> {
     current_page: Page,
     writer: File,
     reader: File,

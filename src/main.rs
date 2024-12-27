@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use db::Db;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -54,39 +55,64 @@ impl<T> RingBuffer<T> {
     }
 }
 
-#[derive(Default, Clone)]
 struct Account {
-    balance: i32,
-    limit: i32,
+    balance: i64,
+    limit: i64,
     transaction: RingBuffer<Transaction>,
+    db: Db<(i64, Transaction), 128>,
+}
+
+impl<A> FromIterator<A> for RingBuffer<A> {
+    fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
+        let mut ring_buffer = Self::with_capacity(10);
+        for item in iter.into_iter() {
+            ring_buffer.push(item);
+        }
+        ring_buffer
+    }
 }
 
 impl Account {
-    pub fn with_limit(limit: i32) -> Self {
-        Self {
+    pub fn with_db(
+        path: impl AsRef<std::path::Path>,
+        limit: i64,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut db = Db::<(i64, Transaction), 128>::from_path(path)?;
+
+        let mut transaction = db.rows().collect::<Vec<_>>();
+
+        let balance = transaction
+            .last()
+            .map(|(balance, _)| *balance)
+            .unwrap_or_default();
+
+        transaction.reverse();
+
+        Ok(Self {
             limit,
-            ..Default::default()
-        }
+            balance,
+            transaction: transaction.into_iter().map(|(_, t)| t).collect(),
+            db,
+        })
     }
 
     pub fn transact(&mut self, transaction: Transaction) -> Result<(), &'static str> {
-        match transaction.kind {
-            TransactionType::Credit => {
-                self.balance += transaction.value;
-                self.transaction.push(transaction);
-                Ok(())
-            }
-
+        let balance = match transaction.kind {
+            TransactionType::Credit => self.balance + transaction.value,
             TransactionType::Debit => {
                 if self.balance + self.limit >= transaction.value {
-                    self.balance -= transaction.value;
-                    self.transaction.push(transaction);
-                    Ok(())
+                    self.balance - transaction.value
                 } else {
-                    Err("Not enough balance")
+                    return Err("Not enough balance");
                 }
             }
-        }
+        };
+        self.db
+            .insert((balance, transaction.clone()))
+            .map_err(|_| "Failed to persist data")?;
+        self.balance = balance;
+        self.transaction.push(transaction);
+        Ok(())
     }
 }
 
@@ -100,7 +126,7 @@ enum TransactionType {
 
 #[derive(Clone, Serialize, Deserialize)]
 struct Transaction {
-    value: i32,
+    value: i64,
     kind: TransactionType,
     description: Description,
     #[serde(with = "time::serde::rfc3339", default = "OffsetDateTime::now_utc")]
@@ -110,7 +136,7 @@ struct Transaction {
 #[allow(unused)]
 #[derive(Clone, Deserialize)]
 struct TransactionPay {
-    value: i32,
+    value: i64,
     kind: TransactionType,
     description: String,
 }
@@ -125,11 +151,26 @@ async fn main() {
         .unwrap_or(8080);
 
     let accounts = HashMap::<u8, RwLock<Account>>::from_iter([
-        (1, RwLock::new(Account::with_limit(100_000))),
-        (2, RwLock::new(Account::with_limit(80_000))),
-        (3, RwLock::new(Account::with_limit(1_000_000))),
-        (4, RwLock::new(Account::with_limit(10_000_000))),
-        (5, RwLock::new(Account::with_limit(500_000))),
+        (
+            1,
+            RwLock::new(Account::with_db("Account-1", 100_000).unwrap()),
+        ),
+        (
+            2,
+            RwLock::new(Account::with_db("Account-2", 80_000).unwrap()),
+        ),
+        (
+            3,
+            RwLock::new(Account::with_db("Account-3", 1_000_000).unwrap()),
+        ),
+        (
+            4,
+            RwLock::new(Account::with_db("Account-4", 10_000_000).unwrap()),
+        ),
+        (
+            5,
+            RwLock::new(Account::with_db("Account-5", 500_000).unwrap()),
+        ),
     ]);
 
     let app = Router::new()
